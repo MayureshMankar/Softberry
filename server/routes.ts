@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import path from "path";
 import fs from "fs";
-import { storage } from "./storage";
+import { storage } from "./storage.js";
 import {
   insertCartItemSchema,
   insertOrderSchema,
