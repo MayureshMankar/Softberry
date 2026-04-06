@@ -1,0 +1,74 @@
+{
+  "tech_stack": ["TypeScript", "React", "Node.js", "Express", "MongoDB", "TailwindCSS"],
+  "features": [
+    {
+      "name": "Authentication",
+      "description": "User registration, login, and authentication system with JWT tokens",
+      "files": [
+        "client/src/hooks/useAuth.ts",
+        "client/src/lib/authStore.ts",
+        "server/auth.ts",
+        "client/src/pages/Login.tsx",
+        "client/src/pages/Register.tsx"
+      ]
+    },
+    {
+      "name": "Product Management",
+      "description": "Product listing, filtering, and detail views",
+      "files": [
+        "client/src/pages/Products.tsx",
+        "client/src/pages/ProductDetail.tsx",
+        "server/storage.ts",
+        "server/routes.ts",
+        "shared/schema.ts"
+      ]
+    },
+    {
+      "name": "Shopping Cart",
+      "description": "Add, update, and remove items from cart with persistence",
+      "files": [
+        "client/src/hooks/useCart.ts",
+        "client/src/pages/Cart.tsx",
+        "server/storage.ts",
+        "server/routes.ts"
+      ]
+    },
+    {
+      "name": "Checkout Process",
+      "description": "Multi-step checkout with shipping, payment, and order placement",
+      "files": [
+        "client/src/pages/Checkout.tsx",
+        "server/routes.ts",
+        "server/storage.ts"
+      ]
+    },
+    {
+      "name": "Order Management",
+      "description": "View order history and track order status",
+      "files": [
+        "client/src/pages/MyOrders.tsx",
+        "client/src/pages/TrackOrder.tsx",
+        "server/routes.ts",
+        "server/storage.ts"
+      ]
+    },
+    {
+      "name": "Admin Dashboard",
+      "description": "Admin functionality for product and order management",
+      "files": [
+        "client/src/pages/admin/AdminDashboard.tsx",
+        "client/src/pages/admin/Products.tsx",
+        "client/src/pages/admin/Orders.tsx",
+        "server/routes.ts"
+      ]
+    },
+    {
+      "name": "Email Notifications",
+      "description": "Order confirmation and notification emails",
+      "files": [
+        "server/emailService.ts",
+        "server/routes.ts"
+      ]
+    }
+  ]
+}

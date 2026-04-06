@@ -1,0 +1,16 @@
+{
+  "status": "init",
+  "scope": "codebase",
+  "type": "frontend",
+  "localEndpoint": "http://localhost:5173",
+  "serverPort": 51431,
+  "executionArgs": {
+    "projectName": "royals_decording",
+    "projectPath": "c:\\royals_decording webbbbbbbbb",
+    "testIds": [],
+    "additionalInstruction": "Generate tests for the complete e-commerce flow: user authentication, product browsing, cart management, checkout process, and order management.",
+    "envs": {
+      "API_KEY": "sk-user-IOTw-NXcjGGo3IxfGeR1mGj5R2XjwNCeFvb99fVr6XjH-SH6WzaZmezjtwKBdVeicn9NN47-tYHuYJX_SzViPzB64sQvPMi8QFK2gtbfsi4su78HN3i7cFT5yDCtQe5UjYc"
+    }
+  }
+}

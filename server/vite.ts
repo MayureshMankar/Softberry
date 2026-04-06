@@ -42,6 +42,10 @@ export async function setupVite(app: Express, server: Server) {
 
   app.use(vite.middlewares);
   app.use("*", async (req, res, next) => {
+    // Log all requests that reach this middleware
+    console.log("Vite catch-all middleware reached:", req.method, req.url);
+    console.log("Request headers at Vite middleware:", req.headers);
+    
     const url = req.originalUrl;
 
     try {

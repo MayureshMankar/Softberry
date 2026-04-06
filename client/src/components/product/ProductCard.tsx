@@ -4,9 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { useCart } from "@/hooks/useCart";
+import { useTheme } from "@/contexts/ThemeContext";
 import { Heart, Eye, Star } from "lucide-react";
 import type { ProductWithDetails } from "@shared/schema";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 interface ProductCardProps {
   product: ProductWithDetails;
@@ -15,16 +17,22 @@ interface ProductCardProps {
 
 export function ProductCard({ product, className }: ProductCardProps) {
   const { addToCart, isAddingToCart } = useCart();
+  const { colors } = useTheme(); // Use standard theme colors
   const [isImageLoaded, setIsImageLoaded] = useState(false);
+  const { toast } = useToast();
 
-  const formatPrice = (price: string) => {
-    return `₹${parseFloat(price).toLocaleString()}`;
+  const formatPrice = (price: string | number) => {
+    const numPrice = typeof price === "string" ? parseFloat(price) : price;
+    return `₹${numPrice.toLocaleString()}`;
   };
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    addToCart({ productId: product.id, quantity: 1 });
+    
+    // Send the product slug instead of simple ID for homepage products
+    // The backend will handle the conversion from slug to real product ID
+    addToCart({ productId: product.slug || product.id, quantity: 1 });
   };
 
   const handleWishlistClick = (e: React.MouseEvent) => {
@@ -58,129 +66,238 @@ export function ProductCard({ product, className }: ProductCardProps) {
   const badge = getBadgeInfo();
 
   return (
-    <Card 
-      className={cn(
-        "card-hover bg-white rounded-2xl shadow-xl group overflow-hidden border-0",
-        className
-      )}
-      data-testid={`product-card-${product.id}`}
-    >
-      <Link href={`/product/${product.slug}`}>
-        <div className="relative">
-          {/* Product Image */}
-          <div className="relative h-64 bg-gradient-to-br from-warm-gray/20 to-champagne/20 overflow-hidden">
-            {product.imageUrl && (
-              <>
-                {!isImageLoaded && (
-                  <div className="absolute inset-0 bg-warm-gray/10 animate-pulse" />
-                )}
-                <img
-                  src={product.imageUrl}
-                  alt={product.name}
-                  className={cn(
-                    "w-full h-full object-cover group-hover:scale-110 transition-transform duration-500",
-                    isImageLoaded ? "opacity-100" : "opacity-0"
-                  )}
-                  onLoad={() => setIsImageLoaded(true)}
-                  loading="lazy"
-                />
-              </>
-            )}
-            
-            {/* Wishlist Button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute top-4 right-4 w-10 h-10 bg-white/90 hover:bg-champagne transition-colors duration-300 group"
-              onClick={handleWishlistClick}
-              data-testid={`wishlist-button-${product.id}`}
+    <div className={cn("group relative", className)}>
+      {/* Premium Product Card */}
+      <Card 
+        className="relative overflow-hidden rounded-xl transition-all duration-300 hover:shadow-xl"
+        style={{
+          backgroundColor: colors.background,
+          borderColor: colors.borderLight,
+          borderWidth: '1px',
+          borderStyle: 'solid'
+        }}
+        data-testid={`product-card-${product.id}`}
+      >
+        <Link href={`/product/${product.slug}`}>
+          <div className="relative">
+            {/* Premium Product Image */}
+            <div 
+              className="relative h-48 overflow-hidden rounded-t-xl"
+              style={{ backgroundColor: colors.surface }}
             >
-              <Heart className="h-4 w-4 text-warm-gray group-hover:text-luxury-black transition-colors duration-300" />
-            </Button>
+              {product.imageUrl && (
+                <>
+                  {/* Loading Skeleton */}
+                  {!isImageLoaded && (
+                    <div className="absolute inset-0 skeleton-luxury rounded-t-3xl" />
+                  )}
+                  <img
+                    src={product.imageUrl}
+                    alt={product.name}
+                    className={cn(
+                      "w-full h-full object-cover group-hover:scale-110 transition-all duration-700",
+                      isImageLoaded ? "opacity-100" : "opacity-0"
+                    )}
+                    onLoad={() => setIsImageLoaded(true)}
+                    loading="lazy"
+                  />
+                </>  
+              )}
+              
+              {/* Gradient Overlay */}
+              <div 
+                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                style={{
+                  background: `linear-gradient(to top, ${colors.background}20, transparent)`
+                }}
+              />
+              
+              {/* Premium Wishlist Button */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-3 right-3 w-8 h-8 rounded-lg group/btn transition-all duration-300"
+                style={{
+                  backgroundColor: `${colors.background}80`,
+                  borderColor: `${colors.border}30`,
+                  borderWidth: '1px',
+                  borderStyle: 'solid'
+                }}
+                onClick={handleWishlistClick}
+                data-testid={`wishlist-button-${product.id}`}
+              >
+                <Heart 
+                  className="h-4 w-4 transition-all duration-300" 
+                  style={{ color: colors.text.secondary }}
+                />
+              </Button>
 
-            {/* Badge */}
-            {badge && (
-              <Badge className={cn("absolute bottom-4 left-4 text-xs font-bold", badge.className)}>
-                {badge.text}
-              </Badge>
-            )}
-          </div>
+              {/* Premium Badge */}
+              {badge && (
+                <div className="absolute top-3 left-3">
+                  <Badge 
+                    className="px-2 py-1 rounded-lg font-medium text-xs tracking-wide uppercase"
+                    style={{
+                      backgroundColor: colors.accent,
+                      color: colors.background
+                    }}
+                  >
+                    {badge.text}
+                  </Badge>
+                </div>
+              )}
+              
+              {/* Quick View Button - Appears on Hover */}
+              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300">
+                <Button
+                  variant="ghost"
+                  className="px-6 py-2 rounded-lg font-medium transition-all duration-300"
+                  style={{
+                    backgroundColor: colors.accent,
+                    color: colors.background
+                  }}
+                  onClick={handleQuickView}
+                  data-testid={`quick-view-button-${product.id}`}
+                >
+                  <Eye className="h-4 w-4 mr-2" />
+                  Quick View
+                </Button>
+              </div>
+            </div>
 
-          <CardContent className="p-6">
-            <div className="space-y-3">
-              {/* Brand and Product Name */}
-              <div>
+            {/* Premium Card Content */}
+            <CardContent className="p-6 space-y-4">
+              {/* Brand & Product Name */}
+              <div className="space-y-2">
                 {product.brand && (
-                  <p className="text-champagne text-sm font-medium">{product.brand.name}</p>
+                  <div className="flex items-center">
+                    <div 
+                      className="w-2 h-2 rounded-full mr-2" 
+                      style={{ backgroundColor: colors.accent }}
+                    />
+                    <p 
+                      className="text-sm font-medium tracking-wide uppercase"
+                      style={{ color: colors.text.secondary }}
+                    >
+                      {product.brand.name}
+                    </p>
+                  </div>
                 )}
-                <h3 className="font-serif text-xl font-bold text-luxury-black line-clamp-2">
+                <h3 
+                  className="font-serif text-xl font-bold line-clamp-2 leading-tight"
+                  style={{ color: colors.text.primary }}
+                >
                   {product.name}
                 </h3>
               </div>
 
-              {/* Rating */}
-              <div className="flex items-center gap-1">
-                <div className="flex text-champagne text-sm">
-                  {[...Array(5)].map((_, i) => (
-                    <Star
-                      key={i}
-                      className={cn(
-                        "w-3 h-3",
-                        i < Math.floor(parseFloat(product.averageRating || "0"))
-                          ? "fill-current"
-                          : ""
-                      )}
-                    />
-                  ))}
-                </div>
-                <span className="text-warm-gray text-sm ml-2">
-                  ({product.reviewCount} reviews)
-                </span>
-              </div>
-
-              {/* Price and Volume */}
+              {/* Premium Rating */}
               <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-2xl font-bold text-burgundy">
-                    {formatPrice(product.price)}
+                <div className="flex items-center gap-2">
+                  <div className="flex" style={{ color: colors.accent }}>
+                    {[...Array(5)].map((_, i) => (
+                      <Star
+                        key={i}
+                        className={cn(
+                          "w-3 h-3 transition-all duration-200",
+                          i < Math.floor(Number(product.averageRating || 0))
+                            ? "fill-current"
+                            : "opacity-30"
+                        )}
+                        style={{ color: colors.accent }}
+                      />
+                    ))}
+                  </div>
+                  <span 
+                    className="text-sm"
+                    style={{ color: colors.text.secondary }}
+                  >
+                    ({product.reviewCount})
                   </span>
-                  {product.originalPrice && parseFloat(product.originalPrice) > parseFloat(product.price) && (
-                    <span className="text-warm-gray line-through ml-2">
-                      {formatPrice(product.originalPrice)}
-                    </span>
-                  )}
                 </div>
                 {product.volume && (
-                  <div className="text-champagne text-sm font-medium">
-                    {product.volume}
+                  <div 
+                    className="px-2 py-1 rounded border"
+                    style={{
+                      backgroundColor: `${colors.accent}10`,
+                      borderColor: `${colors.accent}20`
+                    }}
+                  >
+                    <span 
+                      className="text-sm"
+                      style={{ color: colors.text.secondary }}
+                    >
+                      {product.volume}
+                    </span>
                   </div>
                 )}
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex gap-2">
+              {/* Premium Pricing */}
+              <div className="space-y-2">
+                <div className="flex items-baseline gap-2">
+                  <span 
+                    className="font-serif text-2xl font-bold"
+                    style={{ color: colors.text.primary }}
+                  >
+                    {formatPrice(product.price)}
+                  </span>
+                  {product.originalPrice && Number(product.originalPrice) > Number(product.price) && (
+                    <span 
+                      className="line-through text-lg opacity-60"
+                      style={{ color: colors.text.secondary }}
+                    >
+                      {formatPrice(product.originalPrice)}
+                    </span>
+                  )}
+                </div>
+                {product.originalPrice && Number(product.originalPrice) > Number(product.price) && (
+                  <div 
+                    className="inline-flex items-center px-2 py-1 rounded text-xs"
+                    style={{
+                      backgroundColor: `${colors.accent}10`,
+                      color: colors.text.secondary
+                    }}
+                  >
+                    Save {Math.round((1 - Number(product.price) / Number(product.originalPrice)) * 100)}%
+                  </div>
+                )}
+              </div>
+
+              {/* Premium Action Button */}
+              <div className="pt-2">
                 <Button
-                  className="flex-1 bg-luxury-black text-cream hover:bg-champagne hover:text-luxury-black transition-all duration-300 font-medium"
+                  className="w-full font-semibold py-3 rounded-lg transition-all duration-300"
+                  style={{
+                    backgroundColor: colors.accent,
+                    color: colors.background
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = colors.accentHover;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = colors.accent;
+                  }}
                   onClick={handleAddToCart}
                   disabled={isAddingToCart}
                   data-testid={`add-to-cart-button-${product.id}`}
                 >
-                  {isAddingToCart ? "Adding..." : "Add to Cart"}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="border-luxury-black hover:bg-luxury-black hover:text-cream transition-colors duration-300"
-                  onClick={handleQuickView}
-                  data-testid={`quick-view-button-${product.id}`}
-                >
-                  <Eye className="h-4 w-4" />
+                  {isAddingToCart ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                      Adding to Cart...
+                    </>
+                  ) : (
+                    "Add to Cart"
+                  )}
                 </Button>
               </div>
-            </div>
-          </CardContent>
-        </div>
-      </Link>
-    </Card>
+            </CardContent>
+          </div>
+        </Link>
+      </Card>
+      
+
+    </div>
   );
 }

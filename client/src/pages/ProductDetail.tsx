@@ -1,18 +1,17 @@
-import { useQuery } from "@tanstack/react-query";
 import { useRoute, Link } from "wouter";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { BackToTop } from "@/components/common/BackToTop";
 import { ProductCard } from "@/components/product/ProductCard";
 import { useCart } from "@/hooks/useCart";
 import { useAuth } from "@/hooks/useAuth";
-import { Skeleton } from "@/components/ui/skeleton";
+import { useTheme } from "@/contexts/ThemeContext";
 import { 
   Heart, 
   Star, 
@@ -24,27 +23,122 @@ import {
   Plus,
   Minus
 } from "lucide-react";
-import type { ProductWithDetails } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
-import { isUnauthorizedError } from "@/lib/authUtils";
+
+// Import homepage data
+import { 
+  homepageProducts,
+  type HomepageProduct
+} from "@/data/homepage-products";
+
+// Convert homepage product to component expected format
+const convertProduct = (product: HomepageProduct) => ({
+  ...product,
+  _id: { toString: () => product.id },
+  brandId: undefined,
+  categoryId: undefined,
+  brand: { 
+    name: product.brand, 
+    _id: { toString: () => '1' }, 
+    description: '', 
+    slug: product.brand.toLowerCase().replace(/\s+/g, '-'), 
+    createdAt: new Date() 
+  },
+  category: { 
+    name: product.category, 
+    _id: { toString: () => '1' }, 
+    description: '', 
+    slug: product.category.toLowerCase().replace(/\s+/g, '-'), 
+    createdAt: new Date() 
+  },
+  createdAt: new Date(),
+  updatedAt: new Date(),
+} as any);
+
+// Convert database product to component expected format
+const convertDatabaseProduct = (product: any) => ({
+  ...product,
+  id: product._id?.toString() || product.id,
+  _id: { toString: () => product._id?.toString() || product.id },
+  brand: product.brand || { 
+    name: product.brand, 
+    _id: { toString: () => '1' }, 
+    description: '', 
+    slug: (product.brand || '').toLowerCase().replace(/\s+/g, '-'), 
+    createdAt: new Date() 
+  },
+  category: product.category || { 
+    name: product.category, 
+    _id: { toString: () => '1' }, 
+    description: '', 
+    slug: (product.category || '').toLowerCase().replace(/\s+/g, '-'), 
+    createdAt: new Date() 
+  },
+  createdAt: product.createdAt || new Date(),
+  updatedAt: product.updatedAt || new Date(),
+} as any);
 
 export default function ProductDetail() {
   const [, params] = useRoute("/product/:slug");
   const { addToCart, isAddingToCart } = useCart();
   const { isAuthenticated } = useAuth();
+  const { colors } = useTheme();
   const { toast } = useToast();
   const [quantity, setQuantity] = useState(1);
   const [selectedImage, setSelectedImage] = useState(0);
+  const [activeTab, setActiveTab] = useState("description");
 
-  const { data: product, isLoading } = useQuery<ProductWithDetails>({
-    queryKey: ["/api/products/slug", params?.slug],
+  // Fetch product from API
+  const { data: apiProduct, isLoading: isApiLoading, error: apiError } = useQuery({
+    queryKey: ["product", params?.slug],
+    queryFn: async () => {
+      if (!params?.slug) return null;
+      const response = await fetch(`/api/products/slug/${params.slug}`);
+      if (!response.ok) {
+        if (response.status === 404) return null;
+        throw new Error("Failed to fetch product");
+      }
+      return response.json();
+    },
     enabled: !!params?.slug,
   });
 
-  const { data: relatedProducts = [] } = useQuery<ProductWithDetails[]>({
-    queryKey: ["/api/products", { category: product?.category?.slug, limit: 4 }],
-    enabled: !!product?.category?.slug,
-  });
+  // Find product by slug - first check API, then fallback to static data
+  const product = useMemo(() => {
+    if (!params?.slug) return null;
+    
+    // If we have API data, use it
+    if (apiProduct !== undefined) {
+      return apiProduct ? convertDatabaseProduct(apiProduct) : null;
+    }
+    
+    // If there was an API error (like 404), fallback to static data
+    if (apiError) {
+      const foundProduct = homepageProducts.find(p => p.slug === params.slug);
+      return foundProduct ? convertProduct(foundProduct) : null;
+    }
+    
+    // While API is loading, we don't show anything yet
+    return null;
+  }, [params?.slug, apiProduct, apiError]);
+
+  // Find related products from the same category
+  const relatedProducts = useMemo(() => {
+    if (!product) return [];
+    
+    // For API products, use API to get related products
+    if (apiProduct) {
+      // We'll implement this later if needed
+      return [];
+    }
+    
+    // For static products, use static data
+    const related = homepageProducts
+      .filter(p => p.category === product.category.name && p.id !== product.id && p.isActive)
+      .slice(0, 4)
+      .map(convertProduct);
+    return related;
+  }, [product, apiProduct]);
 
   const handleAddToCart = () => {
     if (!product) return;
@@ -56,12 +150,14 @@ export default function ProductDetail() {
         variant: "destructive",
       });
       setTimeout(() => {
-        window.location.href = "/api/login";
+        window.location.href = "/login";
       }, 1000);
       return;
     }
-
-    addToCart({ productId: product.id, quantity });
+    
+    // Always send the product slug for homepage products
+    // The backend will handle the conversion from slug to real product ID
+    addToCart({ productId: product.slug, quantity });
   };
 
   const handleWishlist = () => {
@@ -72,7 +168,7 @@ export default function ProductDetail() {
         variant: "destructive",
       });
       setTimeout(() => {
-        window.location.href = "/api/login";
+        window.location.href = "/login";
       }, 1000);
       return;
     }
@@ -83,50 +179,42 @@ export default function ProductDetail() {
     });
   };
 
-  const formatPrice = (price: string) => {
-    return `₹${parseFloat(price).toLocaleString()}`;
+  const formatPrice = (price: string | number) => {
+    return `₹${parseFloat(price.toString()).toLocaleString()}`;
   };
 
   const getBadgeInfo = () => {
     if (!product) return null;
     
     if (product.isNewArrival) {
-      return { text: "NEW ARRIVAL", className: "bg-champagne text-luxury-black" };
+      return { text: "NEW ARRIVAL", isSpecial: true };
     }
     if (product.isBestSeller) {
-      return { text: "BESTSELLER", className: "bg-burgundy text-cream" };
+      return { text: "BESTSELLER", isSpecial: true };
     }
     if (product.isLimitedEdition) {
-      return { text: "LIMITED EDITION", className: "bg-rose-gold text-luxury-black" };
+      return { text: "LIMITED EDITION", isSpecial: true };
     }
     if (product.isFeatured) {
-      return { text: "EXCLUSIVE", className: "bg-champagne text-luxury-black" };
+      return { text: "EXCLUSIVE", isSpecial: false };
     }
     return null;
   };
 
   const badge = getBadgeInfo();
-  const productImages = product?.images && product.images.length > 0 
-    ? product.images 
-    : product?.imageUrl 
-    ? [product.imageUrl] 
-    : [];
+  const productImages = [product?.imageUrl].filter(Boolean);
 
-  if (isLoading) {
+  if (isApiLoading) {
     return (
-      <div className="bg-cream font-sans min-h-screen">
+      <div style={{ backgroundColor: colors.background, minHeight: '100vh' }}>
         <Header />
-        <div className="container mx-auto px-4 py-8">
-          <div className="grid lg:grid-cols-2 gap-12">
-            <Skeleton className="h-96 w-full rounded-2xl" />
-            <div className="space-y-6">
-              <Skeleton className="h-8 w-3/4" />
-              <Skeleton className="h-6 w-1/2" />
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-          </div>
+        <div className="container mx-auto px-4 py-16 text-center">
+          <h1 
+            className="font-serif text-4xl font-bold mb-4"
+            style={{ color: colors.text.primary }}
+          >
+            Loading Product...
+          </h1>
         </div>
       </div>
     );
@@ -134,12 +222,35 @@ export default function ProductDetail() {
 
   if (!product) {
     return (
-      <div className="bg-cream font-sans min-h-screen">
+      <div style={{ backgroundColor: colors.background, minHeight: '100vh' }}>
         <Header />
         <div className="container mx-auto px-4 py-16 text-center">
-          <h1 className="font-serif text-4xl font-bold text-luxury-black mb-4">Product Not Found</h1>
-          <p className="text-warm-gray mb-8">The product you're looking for doesn't exist or has been removed.</p>
-          <Button asChild data-testid="back-to-products-button">
+          <h1 
+            className="font-serif text-4xl font-bold mb-4"
+            style={{ color: colors.text.primary }}
+          >
+            Product Not Found
+          </h1>
+          <p 
+            className="mb-8"
+            style={{ color: colors.text.secondary }}
+          >
+            The product you're looking for doesn't exist or has been removed.
+          </p>
+          <Button 
+            asChild 
+            className="transition-all duration-300"
+            style={{
+              backgroundColor: colors.accent,
+              color: colors.background
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = colors.accentHover;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = colors.accent;
+            }}
+          >
             <Link href="/products">
               <ChevronLeft className="mr-2 h-4 w-4" />
               Back to Products
@@ -150,333 +261,514 @@ export default function ProductDetail() {
     );
   }
 
-  const filteredRelatedProducts = relatedProducts.filter(p => p.id !== product.id).slice(0, 4);
-
   return (
-    <div className="bg-cream font-sans min-h-screen">
+    <div style={{ backgroundColor: colors.background, minHeight: '100vh' }}>
       <Header />
       
       {/* Breadcrumb */}
-      <div className="bg-warm-gray/10 py-4">
+      <div style={{ backgroundColor: colors.surface, padding: '1rem 0' }}>
         <div className="container mx-auto px-4">
-          <nav className="flex items-center space-x-2 text-sm text-warm-gray">
-            <Link href="/" className="hover:text-champagne transition-colors">Home</Link>
+          <nav 
+            className="flex items-center space-x-2 text-sm"
+            style={{ color: colors.text.secondary }}
+          >
+            <Link 
+              href="/" 
+              className="transition-colors duration-200 hover:underline"
+              style={{ color: colors.text.secondary }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = colors.text.primary;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = colors.text.secondary;
+              }}
+            >
+              Home
+            </Link>
             <span>›</span>
-            <Link href="/products" className="hover:text-champagne transition-colors">Products</Link>
+            <Link 
+              href="/products" 
+              className="transition-colors duration-200 hover:underline"
+              style={{ color: colors.text.secondary }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = colors.text.primary;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = colors.text.secondary;
+              }}
+            >
+              Products
+            </Link>
             <span>›</span>
             {product.category && (
               <>
-                <Link href={`/products?category=${product.category.slug}`} className="hover:text-champagne transition-colors">
+                <Link 
+                  href={`/products?category=${product.category.slug}`} 
+                  className="transition-colors duration-200 hover:underline"
+                  style={{ color: colors.text.secondary }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = colors.text.primary;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = colors.text.secondary;
+                  }}
+                >
                   {product.category.name}
                 </Link>
                 <span>›</span>
               </>
             )}
-            <span className="text-luxury-black font-medium">{product.name}</span>
+            <span 
+              className="font-medium"
+              style={{ color: colors.text.primary }}
+            >
+              {product.name}
+            </span>
           </nav>
         </div>
       </div>
 
       <div className="container mx-auto px-4 py-8">
-        <div className="grid lg:grid-cols-2 gap-12">
-          {/* Product Images */}
-          <div className="space-y-4">
-            <div className="relative aspect-square bg-warm-gray/5 rounded-2xl overflow-hidden">
-              {productImages.length > 0 && (
-                <img
-                  src={productImages[selectedImage]}
-                  alt={product.name}
-                  className="w-full h-full object-cover"
-                  loading="eager"
-                />
-              )}
-              {badge && (
-                <Badge className={`absolute top-4 left-4 ${badge.className}`}>
-                  {badge.text}
-                </Badge>
+        {/* Three Column Layout - Adjusted proportions */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
+          {/* Left Column - Product Images */}
+          <div className="lg:col-span-5 w-full">
+            <div className="md:sticky top-4 space-y-4">
+              {/* Main Product Image */}
+              <div 
+                className="relative rounded-2xl overflow-hidden"
+                style={{ backgroundColor: colors.surface, aspectRatio: '1/1' }}
+              >
+                {productImages.length > 0 && (
+                  <img
+                    src={productImages[selectedImage]}
+                    alt={product.name}
+                    className="w-full h-full object-cover"
+                    loading="eager"
+                  />
+                )}
+                {badge && (
+                  <Badge 
+                    className="absolute top-4 right-4 px-3 py-1 rounded-full font-bold text-xs"
+                    style={{ 
+                      backgroundColor: badge.isSpecial ? colors.accent : colors.surfaceSecondary,
+                      color: badge.isSpecial ? colors.background : colors.text.primary,
+                      border: `1px solid ${badge.isSpecial ? colors.accent : colors.border}`
+                    }}
+                  >
+                    {badge.text}
+                  </Badge>
+                )}
+              </div>
+              
+              {/* Thumbnail Images */}
+              {productImages.length > 1 && (
+                <div className="grid grid-cols-4 gap-2">
+                  {productImages.map((image, index) => (
+                    <button
+                      key={index}
+                      className={`aspect-square rounded-lg overflow-hidden border-2`}
+                      style={{
+                        backgroundColor: colors.surface,
+                        borderColor: selectedImage === index ? colors.accent : `${colors.border}33`,
+                      }}
+                      onClick={() => setSelectedImage(index)}
+                    >
+                      <img
+                        src={image}
+                        alt={`${product.name} view ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
-            
-            {productImages.length > 1 && (
-              <div className="grid grid-cols-4 gap-4">
-                {productImages.map((image, index) => (
-                  <button
-                    key={index}
-                    className={`aspect-square bg-warm-gray/5 rounded-lg overflow-hidden border-2 transition-colors ${
-                      selectedImage === index ? 'border-champagne' : 'border-transparent hover:border-warm-gray'
-                    }`}
-                    onClick={() => setSelectedImage(index)}
-                    data-testid={`product-image-${index}`}
-                  >
-                    <img
-                      src={image}
-                      alt={`${product.name} view ${index + 1}`}
-                      className="w-full h-full object-cover"
-                    />
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
-
-          {/* Product Info */}
-          <div className="space-y-6">
-            <div>
-              {product.brand && (
-                <p className="text-champagne font-medium text-lg mb-2">{product.brand.name}</p>
-              )}
-              <h1 className="font-serif text-4xl font-bold text-luxury-black mb-4">{product.name}</h1>
+          
+          {/* Middle Column - Product Details (reduced Product Features size) */}
+          <div className="lg:col-span-4 w-full">
+            <div className="space-y-6 h-full flex flex-col">
+              {/* Brand and product title */}
+              <div>
+                {product.brand && (
+                  <p className="text-lg font-bold tracking-widest uppercase mb-1" style={{ color: colors.accent }}>{product.brand.name}</p>
+                )}
+                <h1 className="font-serif text-3xl font-bold leading-tight" style={{ color: colors.text.primary }}>{product.name}</h1>
+              </div>
               
-              {/* Rating */}
-              <div className="flex items-center gap-4 mb-4">
+              {/* Rating and review information */}
+              <div className="flex items-center gap-3">
                 <div className="flex items-center gap-1">
-                  <div className="flex text-champagne">
+                  <div className="flex" style={{ color: colors.accent }}>
                     {[...Array(5)].map((_, i) => (
                       <Star
                         key={i}
-                        className={`w-4 h-4 ${
-                          i < Math.floor(parseFloat(product.averageRating || "0"))
+                        className={`w-5 h-5 ${
+                          i < Math.floor(parseFloat((product.averageRating || "0").toString()))
                             ? "fill-current"
                             : ""
                         }`}
                       />
                     ))}
                   </div>
-                  <span className="text-warm-gray text-sm ml-2">
-                    ({product.reviewCount} reviews)
+                  <span className="text-base font-bold" style={{ color: colors.text.primary }}>
+                    {product.averageRating || "0.0"}
                   </span>
                 </div>
+                <span className="text-base" style={{ color: colors.text.secondary }}>
+                  ({product.reviewCount || 0} reviews)
+                </span>
                 {product.volume && (
-                  <Badge variant="outline" className="text-champagne border-champagne">
+                  <Badge 
+                    className="px-3 py-1 rounded-full text-base"
+                    style={{ 
+                      backgroundColor: colors.surface,
+                      color: colors.text.primary,
+                      border: `1px solid ${colors.border}`
+                    }}
+                  >
                     {product.volume}
                   </Badge>
                 )}
               </div>
-
-              {/* Price */}
-              <div className="flex items-center gap-4 mb-6">
-                <span className="text-3xl font-bold text-burgundy">
-                  {formatPrice(product.price)}
-                </span>
-                {product.originalPrice && parseFloat(product.originalPrice) > parseFloat(product.price) && (
-                  <span className="text-xl text-warm-gray line-through">
-                    {formatPrice(product.originalPrice)}
+              
+              {/* Pricing display */}
+              <div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-bold font-serif" style={{ color: colors.text.primary }}>
+                    {formatPrice(product.price)}
                   </span>
-                )}
+                  {product.originalPrice && parseFloat(product.originalPrice.toString()) > parseFloat(product.price.toString()) && (
+                    <span className="text-xl line-through" style={{ color: colors.text.secondary }}>
+                      {formatPrice(product.originalPrice)}
+                    </span>
+                  )}
+                </div>
               </div>
-
-              {/* Short Description */}
+              
+              {/* Short description */}
               {product.shortDescription && (
-                <p className="text-warm-gray leading-relaxed mb-6">
+                <p className="text-base leading-relaxed" style={{ color: colors.text.secondary }}>
                   {product.shortDescription}
                 </p>
               )}
-            </div>
-
-            {/* Quantity & Add to Cart */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-4">
-                <label className="text-sm font-medium text-luxury-black">Quantity:</label>
-                <div className="flex items-center border border-warm-gray/30 rounded-lg">
+              
+              {/* Quantity selector and action buttons - push to bottom */}
+              <div className="flex flex-wrap items-center gap-3 pt-2 mt-auto">
+                <div className="flex items-center gap-2">
+                  <label className="text-base font-medium" style={{ color: colors.text.primary }}>Qty:</label>
+                  <div className="flex items-center border rounded-full" style={{ borderColor: `${colors.border}4d` }}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-full"
+                      style={{ 
+                        color: colors.text.primary,
+                        backgroundColor: 'transparent'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = `${colors.text.secondary}1a`;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                      disabled={quantity <= 1}
+                    >
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                    <span className="px-3 py-1 min-w-[2rem] text-center font-bold text-base" style={{ color: colors.text.primary }}>
+                      {quantity}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-full"
+                      style={{ 
+                        color: colors.text.primary,
+                        backgroundColor: 'transparent'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = `${colors.text.secondary}1a`;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                      onClick={() => setQuantity(quantity + 1)}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                
+                <div className="flex gap-2">
                   <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-10 w-10"
-                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    disabled={quantity <= 1}
-                    data-testid="decrease-quantity-button"
+                    size="sm"
+                    className="font-bold py-2 px-4 rounded-full text-base"
+                    style={{
+                      backgroundColor: colors.accent,
+                      color: colors.background
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = colors.accentHover;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = colors.accent;
+                    }}
+                    onClick={handleAddToCart}
+                    disabled={isAddingToCart}
                   >
-                    <Minus className="h-4 w-4" />
+                    <ShoppingBag className="mr-2 h-4 w-4" />
+                    {isAddingToCart ? "Adding..." : "Add to Cart"}
                   </Button>
-                  <span className="px-4 py-2 min-w-[3rem] text-center font-medium">
-                    {quantity}
-                  </span>
                   <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-10 w-10"
-                    onClick={() => setQuantity(quantity + 1)}
-                    data-testid="increase-quantity-button"
+                    variant="outline"
+                    size="sm"
+                    className="py-2 px-4 rounded-full text-base"
+                    style={{
+                      borderColor: colors.border,
+                      color: colors.text.primary,
+                      backgroundColor: 'transparent'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = colors.accent;
+                      e.currentTarget.style.color = colors.background;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.color = colors.text.primary;
+                    }}
+                    onClick={handleWishlist}
                   >
-                    <Plus className="h-4 w-4" />
+                    <Heart className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
-
-              <div className="flex gap-4">
-                <Button
-                  size="lg"
-                  className="flex-1 bg-luxury-black text-cream hover:bg-champagne hover:text-luxury-black font-medium"
-                  onClick={handleAddToCart}
-                  disabled={isAddingToCart}
-                  data-testid="add-to-cart-button"
-                >
-                  <ShoppingBag className="mr-2 h-5 w-5" />
-                  {isAddingToCart ? "Adding..." : "Add to Cart"}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="border-luxury-black text-luxury-black hover:bg-luxury-black hover:text-cream"
-                  onClick={handleWishlist}
-                  data-testid="add-to-wishlist-button"
-                >
-                  <Heart className="h-5 w-5" />
-                </Button>
+              
+              {/* Product Features - Reduced size */}
+              <div className="p-3 rounded-xl" style={{ backgroundColor: colors.surface }}>
+                <h3 className="font-bold mb-2 text-sm" style={{ color: colors.text.primary }}>Product Features</h3>
+                <div className="grid grid-cols-3 gap-1">
+                  <div className="text-center p-1 rounded-lg" style={{ backgroundColor: colors.background }}>
+                    <Shield className="w-4 h-4 mx-auto mb-1" style={{ color: colors.accent }} />
+                    <p className="text-xs font-bold" style={{ color: colors.text.primary }}>Authentic</p>
+                  </div>
+                  <div className="text-center p-1 rounded-lg" style={{ backgroundColor: colors.background }}>
+                    <Truck className="w-4 h-4 mx-auto mb-1" style={{ color: colors.accent }} />
+                    <p className="text-xs font-bold" style={{ color: colors.text.primary }}>Free Shipping</p>
+                  </div>
+                  <div className="text-center p-1 rounded-lg" style={{ backgroundColor: colors.background }}>
+                    <RotateCcw className="w-4 h-4 mx-auto mb-1" style={{ color: colors.accent }} />
+                    <p className="text-xs font-bold" style={{ color: colors.text.primary }}>Easy Returns</p>
+                  </div>
+                </div>
               </div>
             </div>
-
-            {/* Product Features */}
-            <Card className="p-6">
-              <div className="grid grid-cols-3 gap-4">
-                <div className="text-center">
-                  <Shield className="w-6 h-6 text-champagne mx-auto mb-2" />
-                  <p className="text-xs font-medium text-luxury-black">Authentic</p>
-                </div>
-                <div className="text-center">
-                  <Truck className="w-6 h-6 text-champagne mx-auto mb-2" />
-                  <p className="text-xs font-medium text-luxury-black">Free Shipping</p>
-                </div>
-                <div className="text-center">
-                  <RotateCcw className="w-6 h-6 text-champagne mx-auto mb-2" />
-                  <p className="text-xs font-medium text-luxury-black">Easy Returns</p>
-                </div>
-              </div>
-            </Card>
           </div>
-        </div>
-
-        {/* Product Details Tabs */}
-        <div className="mt-16">
-          <Tabs defaultValue="description" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="description" data-testid="description-tab">Description</TabsTrigger>
-              <TabsTrigger value="notes" data-testid="notes-tab">Fragrance Notes</TabsTrigger>
-              <TabsTrigger value="details" data-testid="details-tab">Details</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="description" className="mt-6">
-              <Card>
-                <CardContent className="p-6">
-                  <div className="prose max-w-none">
-                    <p className="text-warm-gray leading-relaxed">
+          
+          {/* Right Column - Additional Information (increased to 3/12) */}
+          <div className="lg:col-span-3 w-full mt-6 lg:mt-0">
+            <div className="space-y-6 min-w-0 h-full flex flex-col">
+              {/* Tab Navigation */}
+              <div className="flex gap-4 border-b" style={{ borderColor: `${colors.border}33` }}>
+                <button
+                  onClick={() => setActiveTab("description")}
+                  className={`pb-2 text-base font-bold relative`}
+                  style={{
+                    color: activeTab === "description" ? colors.text.primary : colors.text.secondary,
+                  }}
+                >
+                  Description
+                  {activeTab === "description" && (
+                    <div 
+                      className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full"
+                      style={{ backgroundColor: colors.accent }}
+                    />
+                  )}
+                </button>
+                <button
+                  onClick={() => setActiveTab("notes")}
+                  className={`pb-2 text-base font-bold relative`}
+                  style={{
+                    color: activeTab === "notes" ? colors.text.primary : colors.text.secondary,
+                  }}
+                >
+                  Key Ingredients
+                  {activeTab === "notes" && (
+                    <div 
+                      className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full"
+                      style={{ backgroundColor: colors.accent }}
+                    />
+                  )}
+                </button>
+                <button
+                  onClick={() => setActiveTab("details")}
+                  className={`pb-2 text-base font-bold relative`}
+                  style={{
+                    color: activeTab === "details" ? colors.text.primary : colors.text.secondary,
+                  }}
+                >
+                  Details
+                  {activeTab === "details" && (
+                    <div 
+                      className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full"
+                      style={{ backgroundColor: colors.accent }}
+                    />
+                  )}
+                </button>
+              </div>
+              
+              {/* Tab Content */}
+              <div className="p-4 rounded-2xl flex-grow flex flex-col" style={{ backgroundColor: colors.surface }}>
+                {activeTab === "description" && (
+                  <div className="flex-grow">
+                    <h3 className="font-bold mb-3 text-base" style={{ color: colors.text.primary }}>Product Description</h3>
+                    <p className="text-base leading-relaxed" style={{ color: colors.text.secondary }}>
                       {product.description || "No detailed description available for this product."}
                     </p>
                   </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+                )}
             
-            <TabsContent value="notes" className="mt-6">
-              <Card>
-                <CardContent className="p-6">
-                  <div className="grid md:grid-cols-3 gap-6">
-                    {product.topNotes && product.topNotes.length > 0 && (
-                      <div>
-                        <h4 className="font-serif text-lg font-bold text-luxury-black mb-3">Top Notes</h4>
-                        <div className="space-y-2">
-                          {product.topNotes.map((note, index) => (
-                            <Badge key={index} variant="outline" className="mr-2">
-                              {note}
-                            </Badge>
-                          ))}
+                {activeTab === "notes" && (
+                  <div className="flex-grow">
+                    <h3 className="font-bold mb-3 text-base" style={{ color: colors.text.primary }}>Key Ingredients</h3>
+                    <div className="space-y-3">
+                      {product.topNotes && product.topNotes.length > 0 && (
+                        <div>
+                          <p className="text-sm font-bold mb-2" style={{ color: colors.text.primary }}>Key Ingredients</p>
+                          <div className="flex flex-wrap gap-1">
+                            {product.topNotes.map((note: string, index: number) => (
+                              <Badge 
+                                key={index} 
+                                className="px-2 py-1 rounded-full text-sm"
+                                style={{ 
+                                  backgroundColor: colors.background,
+                                  color: colors.text.primary,
+                                  border: `1px solid ${colors.border}`
+                                }}
+                              >
+                                {note}
+                              </Badge>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
-                    
-                    {product.middleNotes && product.middleNotes.length > 0 && (
-                      <div>
-                        <h4 className="font-serif text-lg font-bold text-luxury-black mb-3">Middle Notes</h4>
-                        <div className="space-y-2">
-                          {product.middleNotes.map((note, index) => (
-                            <Badge key={index} variant="outline" className="mr-2">
-                              {note}
-                            </Badge>
-                          ))}
+                      )}
+                      
+                      {product.middleNotes && product.middleNotes.length > 0 && (
+                        <div>
+                          <p className="text-sm font-bold mb-2" style={{ color: colors.text.primary }}>Skin Benefits</p>
+                          <div className="flex flex-wrap gap-1">
+                            {product.middleNotes.map((note: string, index: number) => (
+                              <Badge 
+                                key={index} 
+                                className="px-2 py-1 rounded-full text-sm"
+                                style={{ 
+                                  backgroundColor: colors.background,
+                                  color: colors.text.primary,
+                                  border: `1px solid ${colors.border}`
+                                }}
+                              >
+                                {note}
+                              </Badge>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
-                    
-                    {product.baseNotes && product.baseNotes.length > 0 && (
-                      <div>
-                        <h4 className="font-serif text-lg font-bold text-luxury-black mb-3">Base Notes</h4>
-                        <div className="space-y-2">
-                          {product.baseNotes.map((note, index) => (
-                            <Badge key={index} variant="outline" className="mr-2">
-                              {note}
-                            </Badge>
-                          ))}
+                      )}
+                      
+                      {product.baseNotes && product.baseNotes.length > 0 && (
+                        <div>
+                          <p className="text-sm font-bold mb-2" style={{ color: colors.text.primary }}>Free From</p>
+                          <div className="flex flex-wrap gap-1">
+                            {product.baseNotes.map((note: string, index: number) => (
+                              <Badge 
+                                key={index} 
+                                className="px-2 py-1 rounded-full text-sm"
+                                style={{ 
+                                  backgroundColor: colors.background,
+                                  color: colors.text.primary,
+                                  border: `1px solid ${colors.border}`
+                                }}
+                              >
+                                {note}
+                              </Badge>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            <TabsContent value="details" className="mt-6">
-              <Card>
-                <CardContent className="p-6">
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div>
-                      <h4 className="font-serif text-lg font-bold text-luxury-black mb-4">Product Details</h4>
-                      <dl className="space-y-3">
-                        {product.fragranceFamily && (
-                          <div>
-                            <dt className="text-sm font-medium text-warm-gray">Fragrance Family</dt>
-                            <dd className="text-luxury-black">{product.fragranceFamily}</dd>
-                          </div>
-                        )}
-                        {product.gender && (
-                          <div>
-                            <dt className="text-sm font-medium text-warm-gray">Gender</dt>
-                            <dd className="text-luxury-black">{product.gender}</dd>
-                          </div>
-                        )}
-                        {product.volume && (
-                          <div>
-                            <dt className="text-sm font-medium text-warm-gray">Volume</dt>
-                            <dd className="text-luxury-black">{product.volume}</dd>
-                          </div>
-                        )}
-                      </dl>
-                    </div>
-                    
-                    <div>
-                      <h4 className="font-serif text-lg font-bold text-luxury-black mb-4">Performance</h4>
-                      <dl className="space-y-3">
-                        {product.longevity && (
-                          <div>
-                            <dt className="text-sm font-medium text-warm-gray">Longevity</dt>
-                            <dd className="text-luxury-black">{product.longevity}</dd>
-                          </div>
-                        )}
-                        {product.sillage && (
-                          <div>
-                            <dt className="text-sm font-medium text-warm-gray">Sillage</dt>
-                            <dd className="text-luxury-black">{product.sillage}</dd>
-                          </div>
-                        )}
-                      </dl>
+                      )}
+                      
+                      {/* Adding a fallback content if no notes are available */}
+                      {(!product.topNotes || product.topNotes.length === 0) && 
+                       (!product.middleNotes || product.middleNotes.length === 0) && 
+                       (!product.baseNotes || product.baseNotes.length === 0) && (
+                        <p className="text-base" style={{ color: colors.text.secondary }}>
+                          No ingredient details available for this product.
+                        </p>
+                      )}
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+                )}
+                
+                {activeTab === "details" && (
+                  <div className="flex-grow">
+                    <h3 className="font-bold mb-3 text-base" style={{ color: colors.text.primary }}>Product Details</h3>
+                    <div className="space-y-2 text-base">
+                      {product.fragranceFamily && (
+                        <div className="flex justify-between pb-1" style={{ borderBottom: `1px solid ${colors.border}33` }}>
+                          <span style={{ color: colors.text.secondary }}>Category:</span>
+                          <span className="font-bold" style={{ color: colors.text.primary }}>{product.fragranceFamily}</span>
+                        </div>
+                      )}
+                      {product.gender && (
+                        <div className="flex justify-between pb-1" style={{ borderBottom: `1px solid ${colors.border}33` }}>
+                          <span style={{ color: colors.text.secondary }}>Gender:</span>
+                          <span className="font-bold" style={{ color: colors.text.primary }}>{product.gender}</span>
+                        </div>
+                      )}
+                      {product.volume && (
+                        <div className="flex justify-between pb-1" style={{ borderBottom: `1px solid ${colors.border}33` }}>
+                          <span style={{ color: colors.text.secondary }}>Volume:</span>
+                          <span className="font-bold" style={{ color: colors.text.primary }}>{product.volume}</span>
+                        </div>
+                      )}
+                      {product.longevity && (
+                        <div className="flex justify-between pb-1" style={{ borderBottom: `1px solid ${colors.border}33` }}>
+                          <span style={{ color: colors.text.secondary }}>Longevity:</span>
+                          <span className="font-bold" style={{ color: colors.text.primary }}>{product.longevity}</span>
+                        </div>
+                      )}
+                      {product.sillage && (
+                        <div className="flex justify-between">
+                          <span style={{ color: colors.text.secondary }}>Sillage:</span>
+                          <span className="font-bold" style={{ color: colors.text.primary }}>{product.sillage}</span>
+                        </div>
+                      )}
+                      {/* Adding a fallback content if no details are available */}
+                      {!product.fragranceFamily && !product.gender && !product.volume && !product.longevity && !product.sillage && (
+                        <p className="text-base" style={{ color: colors.text.secondary }}>
+                          No additional details available for this product.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Related Products */}
-        {filteredRelatedProducts.length > 0 && (
-          <div className="mt-20">
-            <div className="text-center mb-12">
-              <h2 className="font-serif text-4xl font-bold text-luxury-black mb-4">You Might Also Like</h2>
-              <p className="text-warm-gray">Discover similar fragrances from our collection</p>
+        {relatedProducts.length > 0 && (
+          <div className="mt-12">
+            <div className="text-center mb-6">
+              <h2 className="font-serif text-2xl font-bold" style={{ color: colors.text.primary }}>You Might Also Like</h2>
             </div>
             
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6" data-testid="related-products">
-              {filteredRelatedProducts.map((relatedProduct) => (
-                <ProductCard key={relatedProduct.id} product={relatedProduct} />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4" data-testid="related-products">
+              {relatedProducts.map((relatedProduct: any) => (
+                <div key={relatedProduct.id} className="scale-90">
+                  <ProductCard product={relatedProduct} />
+                </div>
               ))}
             </div>
           </div>

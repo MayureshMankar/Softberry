@@ -32,7 +32,7 @@ export function useCart() {
           variant: "destructive",
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          window.location.href = "/login";
         }, 500);
         return;
       }
@@ -59,7 +59,7 @@ export function useCart() {
           variant: "destructive",
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          window.location.href = "/login";
         }, 500);
         return;
       }
@@ -90,7 +90,7 @@ export function useCart() {
           variant: "destructive",
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          window.location.href = "/login";
         }, 500);
         return;
       }
@@ -121,7 +121,7 @@ export function useCart() {
           variant: "destructive",
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          window.location.href = "/login";
         }, 500);
         return;
       }
@@ -135,7 +135,7 @@ export function useCart() {
 
   const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
   const totalAmount = cartItems.reduce(
-    (sum, item) => sum + parseFloat(item.product.price) * item.quantity,
+    (sum, item) => sum + Number(item.product.price) * item.quantity,
     0
   );
 
