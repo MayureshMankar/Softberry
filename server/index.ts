@@ -8,13 +8,13 @@ import cors from "cors";
 import rateLimit from "express-rate-limit";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
-import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
-import { connectToDatabase } from "./db";
+import { registerRoutes } from "./routes.js";
+import { setupVite, serveStatic, log } from "./vite.js";
+import { connectToDatabase } from "./db.js";
+import { validateEnv } from "./utils/env.js";
+import { logger } from "./utils/logger.js";
 import { WebSocketServer } from "ws";
 import { createServer } from "http";
-import { validateEnv } from "./utils/env";
-import { logger } from "./utils/logger";
 
 // Validate environment variables on startup
 const env = validateEnv();
