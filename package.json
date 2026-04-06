@@ -5,9 +5,9 @@
   "license": "MIT",
   "scripts": {
     "dev": "cross-env NODE_ENV=development tsx server/index.ts",
-    "dev:client": "vite --host 0.0.0.0 --port 3000",
     "build": "vite build && tsc -p tsconfig.server.json",
     "start": "node dist/server/index.js",
+    "dev:client": "vite --host 0.0.0.0 --port 3000",
     "health": "curl http://127.0.0.1:4000/api/health",
     "mongo-status": "curl http://127.0.0.1:4000/api/health/mongodb",
     "seed-admin": "tsx server/seed-admin.ts",
