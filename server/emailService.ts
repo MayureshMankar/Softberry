@@ -8,6 +8,43 @@ const dotenv = process.env;
 const smtpTimeoutMs = () =>
   Math.min(Math.max(parseInt(process.env.SMTP_CONNECTION_TIMEOUT_MS || '12000', 10) || 12000, 3000), 60000);
 
+const hasResendConfig = () =>
+  !!(process.env.RESEND_API_KEY && process.env.RESEND_API_KEY.trim().length > 0);
+
+const sendWithResend = async (
+  to: string,
+  subject: string,
+  html: string
+): Promise<{ success: boolean; messageId?: string; error?: unknown }> => {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error('RESEND_API_KEY is not configured');
+  }
+
+  const from = process.env.FROM_EMAIL || 'onboarding@resend.dev';
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from,
+      to: [to],
+      subject,
+      html,
+    }),
+  });
+
+  const data: any = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = data?.message || data?.error || `Resend request failed with status ${res.status}`;
+    throw new Error(msg);
+  }
+
+  return { success: true, messageId: data?.id || 'resend-message-id' };
+};
+
 // Create transporter
 export const createTransporter = () => {
   const hasRealSMTP = process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS;
@@ -578,22 +615,30 @@ export const emailTemplates = {
 };
 
 // Send email function
-export const sendEmail = async (to: string, subject: string, html: string) => {
+export const sendEmail = async (
+  to: string,
+  subject: string,
+  html: string
+): Promise<{ success: boolean; messageId?: string; error?: unknown }> => {
   try {
+    console.log(`📧 Sending email to: ${to}`);
+    console.log(`📧 Subject: ${subject}`);
+
+    if (hasResendConfig()) {
+      const result = await sendWithResend(to, subject, html);
+      console.log('✅ Email sent via Resend:', result.messageId);
+      return result;
+    }
+
     const transporter = createTransporter();
-    
     const mailOptions = {
       from: process.env.FROM_EMAIL || 'softberryskincare@gmail.com',
       to,
       subject,
       html
     };
-    
-    console.log(`📧 Sending email to: ${to}`);
-    console.log(`📧 Subject: ${subject}`);
-    
     const info = await transporter.sendMail(mailOptions);
-    console.log('✅ Email sent:', info.messageId);
+    console.log('✅ Email sent via SMTP:', info.messageId);
     
     if (process.env.NODE_ENV === 'development') {
       console.log('🔗 Preview: https://ethereal.email/message/' + info.messageId);
