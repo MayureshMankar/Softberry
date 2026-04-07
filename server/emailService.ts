@@ -2,8 +2,8 @@ import nodemailer from 'nodemailer';
 import { config as dotenvConfig } from 'dotenv';
 
 // Load environment variables
-const dotenv = import.meta.env || process.env;
 dotenvConfig();
+const dotenv = process.env;
 
 // Create transporter
 export const createTransporter = () => {
@@ -654,3 +654,8 @@ export const sendAdminStatusUpdateSummary = async (order: any, user: any) => {
     return { success: false, error };
   }
 };
+
+// Aliases for compatibility with storage.ts and routes.ts
+export const sendOrderConfirmationEmail = sendCustomerOrderConfirmation;
+export const sendAdminOrderNotificationEmail = sendAdminNewOrderNotification;
+export const sendStatusUpdateEmail = sendCustomerStatusUpdate;

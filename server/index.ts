@@ -163,10 +163,9 @@ const startServer = async () => {
     const server = createServer(app);
 
     // Attach WebSocket server to existing HTTP server via upgrade on /ws/admin
-    // Note: WebSockets will NOT work on Vercel/Serverless environments
-    if (env.NODE_ENV !== "production" || process.env.ENABLE_WEBSOCKETS === "true") {
-      try {
-        const wss = new WebSocketServer({ noServer: true });
+    // WebSockets are supported on standard long-running servers like Render
+    try {
+      const wss = new WebSocketServer({ noServer: true });
         server.on('upgrade', (req, socket, head) => {
           try {
             const { url } = req;
@@ -229,12 +228,9 @@ const startServer = async () => {
             });
           }
         };
-        logger.info('✅ WebSocket upgrade route ready at /ws/admin');
-      } catch (wsError) {
-        logger.warn(`⚠️ WebSocket initialization failed: ${wsError}`);
-      }
-    } else {
-      logger.info('ℹ️ WebSocket server disabled in this environment');
+      logger.info('✅ WebSocket upgrade route ready at /ws/admin');
+    } catch (wsError) {
+      logger.warn(`⚠️ WebSocket initialization failed: ${wsError}`);
     }
 
     // Serve uploaded images statically
@@ -271,12 +267,11 @@ const startServer = async () => {
       });
     });
 
-    // Start server listening (only if not running as a module/serverless)
-    if (process.env.VERCEL !== '1') {
-      server.listen(env.PORT, "0.0.0.0", () => {
-        logger.info(`🚀 Server running in ${env.NODE_ENV} mode at http://0.0.0.0:${env.PORT}`);
-      });
-    }
+    // Start server listening
+    server.listen(env.PORT, "0.0.0.0", () => {
+      logger.info(`🚀 Server running in ${env.NODE_ENV} mode at http://0.0.0.0:${env.PORT}`);
+      logger.info(`🔌 WebSocket endpoint available at ws://0.0.0.0:${env.PORT}/ws/admin`);
+    });
 
     return app;
   } catch (error) {
@@ -285,18 +280,5 @@ const startServer = async () => {
   }
 };
 
-// For Vercel/Serverless
-export default app;
-
 // Run the server
-if (process.env.VERCEL !== '1') {
-  startServer();
-} else {
-  // In Vercel, we need to ensure routes are registered even if startServer isn't called normally
-  // This is a bit tricky for monolithic apps on Vercel. 
-  // A better way is to call initialization once.
-  (async () => {
-    await connectToDatabase();
-    await registerRoutes(app);
-  })();
-}
+startServer();

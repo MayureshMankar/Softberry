@@ -1,9 +1,9 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { storage } from './storage';
+import { storage } from './storage.js';
 import type { Request, Response, NextFunction } from 'express';
-import type { User } from './storage';
-import { validateEnv } from './utils/env';
+import type { User } from './storage.js';
+import { validateEnv } from './utils/env.js';
 
 const env = validateEnv();
 

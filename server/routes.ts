@@ -20,15 +20,18 @@ import {
   loginUser,
   updateUserProfile,
   changePassword,
-} from "./auth";
-import { isConnected, getConnectionStatus } from "./db";
+} from "./auth.js";
+import { isConnected, getConnectionStatus } from "./db.js";
 import { 
   sendCustomerOrderConfirmation, 
   sendCustomerStatusUpdate,
   sendAdminNewOrderNotification,
   sendAdminStatusUpdateSummary,
-  sendEmail 
-} from "./emailService";
+  sendEmail,
+  sendOrderConfirmationEmail,
+  sendAdminOrderNotificationEmail,
+  sendStatusUpdateEmail
+} from "./emailService.js";
 import { Types } from "mongoose";
 import type { NextFunction } from "express";
 import { Order, User } from "@shared/schema";
@@ -2287,16 +2290,16 @@ export async function registerRoutes(app: Express) {
       if (!user && req.body.shippingAddress?.email) {
         console.log('📧 Using shipping email as fallback:', req.body.shippingAddress.email);
         user = {
-          _id: userId,
+          _id: userId as any,
           email: req.body.shippingAddress.email,
           firstName: req.body.shippingAddress.firstName || 'Customer',
           lastName: req.body.shippingAddress.lastName || ''
-        };
+        } as any;
       } else if (!user) {
         console.log('⚠️ No user and no shipping email found');
       }
       
-      const orderData = { ...req.body, userId };
+      const orderData = { ...req.body, userId: userId as any };
       
       const validatedData = insertOrderSchema.parse(orderData);
       const newOrder = await storage.createOrder(validatedData);
@@ -2789,7 +2792,7 @@ export async function registerRoutes(app: Express) {
           console.log(`📧 Status changed: '${oldStatus}' → '${newStatus}' - sending customer notification...`);
           
           // Send update to customer ONLY (no admin emails)
-          await sendCustomerStatusUpdate(updatedOrder as any, updatedOrder.userId);
+          await sendCustomerStatusUpdate(updatedOrder as any, (updatedOrder as any).userId);
           
           console.log('✅ Customer status update email sent');
         } else {
@@ -2859,7 +2862,7 @@ export async function registerRoutes(app: Express) {
         }))
       };
       
-      const user = order.userId;
+      const user = (order as any).userId;
       if (!user?.email) {
         return res.status(400).json({ message: "User email not available" });
       }
@@ -3020,7 +3023,7 @@ export async function registerRoutes(app: Express) {
           console.log(`📧 Status changed: '${actualOldStatus}' → '${status}' - sending customer notification...`);
           
           // Send update to customer ONLY (no admin emails)
-          await sendCustomerStatusUpdate(updatedOrder as any, updatedOrder.userId);
+          await sendCustomerStatusUpdate(updatedOrder as any, (updatedOrder as any).userId);
           
           console.log('✅ Customer status update email sent');
         } else {

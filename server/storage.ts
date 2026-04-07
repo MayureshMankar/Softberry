@@ -19,10 +19,15 @@ import {
   insertCartItemSchema,
   insertOrderSchema,
   insertProductSchema
-} from "@shared/schema";
-import { connectToDatabase } from "./db";
+} from "../shared/schema.js";
+import { connectToDatabase } from "./db.js";
 import mongoose, { Types } from "mongoose";
-import { sendOrderConfirmationEmail, sendAdminOrderNotificationEmail } from "./emailService";
+import { 
+  sendOrderConfirmationEmail, 
+  sendAdminOrderNotificationEmail,
+  sendCustomerOrderConfirmation,
+  sendAdminNewOrderNotification
+} from "./emailService.js";
 import { z } from 'zod';
 
 // Type definitions for API responses
