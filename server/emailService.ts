@@ -5,6 +5,9 @@ import { config as dotenvConfig } from 'dotenv';
 dotenvConfig();
 const dotenv = process.env;
 
+const smtpTimeoutMs = () =>
+  Math.min(Math.max(parseInt(process.env.SMTP_CONNECTION_TIMEOUT_MS || '12000', 10) || 12000, 3000), 60000);
+
 // Create transporter
 export const createTransporter = () => {
   const hasRealSMTP = process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS;
@@ -22,15 +25,29 @@ export const createTransporter = () => {
     });
   }
   
+  const port = parseInt(process.env.SMTP_PORT || '587', 10);
+  // SMTP_SECURE=true or implicit SSL port 465
+  const secure =
+    process.env.SMTP_SECURE === 'true' || String(port) === '465';
+
+  const t = smtpTimeoutMs();
+
   // Use real SMTP for production or when configured
   return nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_PORT === '465',
+    port,
+    secure,
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS
-    }
+    },
+    connectionTimeout: t,
+    greetingTimeout: t,
+    socketTimeout: t + 3000,
+    tls: {
+      // Do not fail on minor cert chain issues (some cloud SMTP paths)
+      rejectUnauthorized: process.env.SMTP_TLS_REJECT_UNAUTHORIZED !== 'false',
+    },
   });
 };
 

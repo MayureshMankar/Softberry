@@ -2345,18 +2345,25 @@ export async function registerRoutes(app: Express) {
             lastName: user.lastName 
           }, null, 2));
           
-          // Send professional emails
-          console.log('📧 Sending professional order confirmation emails...');
-          
-          // Send confirmation to customer
-          const customerResult = await sendCustomerOrderConfirmation(populatedOrder, user);
-          
-          // Send notification to admin
-          const adminResult = await sendAdminNewOrderNotification(populatedOrder, user);
-          
-          console.log('📧 Email results - Customer:', customerResult.success ? '✅' : '❌', '| Admin:', adminResult.success ? '✅' : '❌');
-          
-          console.log('📧 ====== EMAIL SENDING COMPLETE ======');
+          // Emails: never block HTTP response (SMTP from cloud hosts often times out; user still gets instant order)
+          console.log('📧 Scheduling order confirmation emails (background)...');
+          setImmediate(() => {
+            void (async () => {
+              try {
+                const customerResult = await sendCustomerOrderConfirmation(populatedOrder, user);
+                const adminResult = await sendAdminNewOrderNotification(populatedOrder, user);
+                console.log(
+                  '📧 Background email results - Customer:',
+                  customerResult.success ? '✅' : '❌',
+                  '| Admin:',
+                  adminResult.success ? '✅' : '❌'
+                );
+              } catch (bgErr) {
+                console.error('❌ Background order email error:', bgErr);
+              }
+            })();
+          });
+          console.log('📧 ====== ORDER EMAILS SCHEDULED (response not waiting on SMTP) ======');
         } catch (emailError) {
           console.error("❌ CATCH ERROR sending order confirmation emails:", emailError);
           // Don't fail the order creation if email sending fails
@@ -2687,59 +2694,6 @@ export async function registerRoutes(app: Express) {
         })
       };
 
-      // Send confirmation emails
-      try {
-        console.log('📧 ====== ORDER CONFIRMATION EMAIL START ======');
-        console.log('👤 User data:', JSON.stringify({ 
-          _id: user._id?.toString(),
-          email: user.email, 
-          firstName: user.firstName, 
-          lastName: user.lastName 
-        }, null, 2));
-        console.log('📦 Order data:', JSON.stringify({
-          orderId: newOrder._id?.toString(),
-          totalAmount: newOrder.totalAmount,
-          itemsCount: populatedOrder.items?.length || 0,
-          hasItems: !!populatedOrder.items && populatedOrder.items.length > 0
-        }, null, 2));
-        
-        // Send email to customer
-        console.log(`📧 Attempting to send to customer: ${user?.email}`);
-        const customerEmailResult = await sendOrderConfirmationEmail(populatedOrder, user);
-        console.log('📧 Customer email RESULT:', JSON.stringify(customerEmailResult, null, 2));
-        if (customerEmailResult.success) {
-          console.log('✅ Customer order confirmation email SENT successfully');
-        } else {
-          const errorMsg = customerEmailResult.error instanceof Error ? customerEmailResult.error.message : String(customerEmailResult.error);
-          console.error('❌ FAILED to send customer email:', errorMsg);
-        }
-        
-        // Send notification to admin
-        const adminEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
-        console.log(`📧 Admin email configured: ${adminEmail}`);
-        const adminEmailResult = await sendAdminOrderNotificationEmail(populatedOrder, user);
-        console.log('📧 Admin email RESULT:', JSON.stringify(adminEmailResult, null, 2));
-        if (adminEmailResult.success) {
-          console.log('✅ Admin order notification email SENT successfully');
-        } else {
-          const errorMsg = adminEmailResult.error instanceof Error ? adminEmailResult.error.message : String(adminEmailResult.error);
-          console.error('❌ FAILED to send admin email:', errorMsg);
-        }
-        
-        console.log('📧 ====== ORDER CONFIRMATION EMAIL END ======');
-        
-        // Log email configuration status
-        const hasSMTPConfig = process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS;
-        if (process.env.NODE_ENV === 'development' && !hasSMTPConfig) {
-          console.log('📝 Note: Emails are being sent to Ethereal.email for testing in development mode.');
-          console.log('📝 To receive real emails, configure SMTP settings in your .env file.');
-        }
-      } catch (emailError) {
-        console.error("❌ CATCH ERROR sending order confirmation emails:", emailError);
-        console.error("Stack trace:", emailError instanceof Error ? emailError.stack : 'No stack');
-        // Don't fail the order creation if email sending fails
-      }
-
       // Clear the user's cart
       try {
         await storage.clearCart(user._id.toString());
@@ -2760,6 +2714,42 @@ export async function registerRoutes(app: Express) {
         message: "Order created successfully",
         order: populatedOrder
       });
+
+      // Confirmation emails after response — SMTP from Render → Gmail often hangs or times out; must not delay checkout
+      try {
+        console.log('📧 Scheduling order confirmation emails (background, authenticateToken route)...');
+        setImmediate(() => {
+          void (async () => {
+            try {
+              console.log('📧 ====== ORDER CONFIRMATION EMAIL START (background) ======');
+              console.log('👤 User data:', JSON.stringify({
+                _id: user._id?.toString(),
+                email: user.email,
+                firstName: user.firstName,
+                lastName: user.lastName
+              }, null, 2));
+              const customerEmailResult = await sendOrderConfirmationEmail(populatedOrder, user);
+              const adminEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
+              console.log(`📧 Admin email configured: ${adminEmail}`);
+              const adminEmailResult = await sendAdminOrderNotificationEmail(populatedOrder, user);
+              console.log(
+                '📧 Background email results - Customer:',
+                customerEmailResult.success ? '✅' : '❌',
+                '| Admin:',
+                adminEmailResult.success ? '✅' : '❌'
+              );
+              const hasSMTPConfig = process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS;
+              if (process.env.NODE_ENV === 'development' && !hasSMTPConfig) {
+                console.log('📝 Note: Emails go to Ethereal in dev when SMTP is not set.');
+              }
+            } catch (emailError) {
+              console.error('❌ Background order confirmation email error:', emailError);
+            }
+          })();
+        });
+      } catch (scheduleErr) {
+        console.error('❌ Failed to schedule order emails:', scheduleErr);
+      }
     } catch (error: any) {
       console.error("Error creating order:", error);
       res.status(500).json({ message: "Failed to create order", error: error.message });
