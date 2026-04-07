@@ -242,7 +242,7 @@ const startServer = async () => {
     await registerRoutes(app);
 
     // Setup Vite or Serve Static
-    if (env.NODE_ENV === "development") {
+    if (env.NODE_ENV === "development" && !process.env.RENDER) {
       await setupVite(app, server);
     } else {
       serveStatic(app);

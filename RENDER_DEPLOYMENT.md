@@ -17,6 +17,7 @@ This project is optimized for deployment on **Render.com** as a **Web Service**.
     - **Start Command**: `npm start`
 4. **Add Environment Variables**:
     - `NODE_ENV`: `production`
+    - `RENDER`: `1` (This tells the server to serve static files directly)
     - `MONGODB_URI`: Your MongoDB Atlas connection string.
     - `SESSION_SECRET`: A long random string (at least 32 chars).
     - `ADMIN_SECRET`: A secret key for administrative access.

@@ -11,6 +11,7 @@ const envSchema = z.object({
   RAZORPAY_KEY_SECRET: z.string().optional(),
   EMAIL_USER: z.string().email().optional(),
   EMAIL_PASS: z.string().optional(),
+  RENDER: z.string().optional(), // Add RENDER environment variable
 });
 
 export type Env = z.infer<typeof envSchema>;
