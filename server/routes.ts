@@ -10,7 +10,7 @@ import {
   insertUserSchema,
   updateProductSchema,
   updateOrderSchema
-} from "@shared/schema";
+} from "../shared/schema.js";
 import {
   authenticateToken,
   optionalAuth,
@@ -34,7 +34,7 @@ import {
 } from "./emailService.js";
 import { Types } from "mongoose";
 import type { NextFunction } from "express";
-import { Order, User } from "@shared/schema";
+import { Order, User } from "../shared/schema.js";
 import Razorpay from "razorpay";
 
 // Initialize Razorpay instance

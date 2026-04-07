@@ -1,8 +1,8 @@
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
-import { User } from '@shared/schema';
-import { hashPassword } from './auth';
-import { connectToDatabase } from './db';
+import { User } from '../shared/schema.js';
+import { hashPassword } from './auth.js';
+import { connectToDatabase } from './db.js';
 
 // Load environment variables
 dotenv.config();

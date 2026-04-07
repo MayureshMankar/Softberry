@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
-import { Product } from '@shared/schema';
-import { connectToDatabase } from './db';
+import { Product } from '../shared/schema.js';
+import { connectToDatabase } from './db.js';
 
 // Load environment variables
 dotenv.config();

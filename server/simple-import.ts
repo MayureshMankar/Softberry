@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { storage } from "./storage";
+import { storage } from "./storage.js";
 
 // Simple function to import static data
 export async function simpleImportStaticData() {
