@@ -5,6 +5,8 @@ const envSchema = z.object({
   PORT: z.string().transform(Number).default("4000"),
   MONGODB_URI: z.string().min(1, "MONGODB_URI is required"),
   SESSION_SECRET: z.string().min(32, "SESSION_SECRET must be at least 32 characters long"),
+  // Optional: separate JWT secret (falls back to SESSION_SECRET)
+  JWT_SECRET: z.string().min(32).optional(),
   ALLOWED_ORIGINS: z.string().optional().default(""),
   // Add other required env vars here (e.g., Razorpay, Email configs)
   RAZORPAY_KEY_ID: z.string().optional(),

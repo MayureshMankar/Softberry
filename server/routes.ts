@@ -255,9 +255,15 @@ export async function registerRoutes(app: Express) {
     }
   });
   
-  app.post("/api/auth/logout", (req, res) => {
-    // For JWT-based auth, logout is handled client-side by removing the token
-    res.json({ message: "Logout successful" });
+  app.post("/api/auth/logout", (req, res, next) => {
+    req.session.destroy((err) => {
+      if (err) {
+        console.error("Error destroying session:", err);
+        return next(err);
+      }
+      res.clearCookie("connect.sid"); // Clear the session cookie
+      res.json({ message: "Logout successful" });
+    });
   });
 
   // Image upload endpoint (Base64 approach)

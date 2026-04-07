@@ -4,11 +4,12 @@ import { storage } from './storage.js';
 import type { Request, Response, NextFunction } from 'express';
 import type { User } from './storage.js';
 import { validateEnv } from './utils/env.js';
+import { User as UserModel } from '../shared/schema.js';
 
 const env = validateEnv();
 
 // JWT secret
-const JWT_SECRET = env.SESSION_SECRET; // Reuse session secret for JWT or add dedicated JWT_SECRET to env.ts
+const JWT_SECRET = env.JWT_SECRET || env.SESSION_SECRET;
 const JWT_EXPIRES_IN = '7d';
 
 // Password requirements
@@ -229,9 +230,12 @@ export async function loginUser(credentials: {
       return { success: false, errors: ['Email and password are required'] };
     }
     
-    // Find user by email
-    const user = await storage.getUserByEmail(email.toLowerCase().trim());
-    if (!user || !user.password) {
+    // Find user by email (include password hash; schema uses select:false)
+    const user = await (UserModel as any)
+      .findOne({ email: email.toLowerCase().trim() })
+      .select('+password')
+      .lean();
+    if (!user || typeof user.password !== 'string' || user.password.length === 0) {
       return { success: false, errors: ['Invalid email or password'] };
     }
     
@@ -242,14 +246,14 @@ export async function loginUser(credentials: {
     }
     
     // Generate token
-    const token = generateToken(user._id.toString());
+    const token = generateToken((user as any)._id.toString());
     
     // Remove password from response
     const userResponse = { ...user, password: undefined };
     
     return {
       success: true,
-      user: userResponse as User,
+      user: userResponse as unknown as User,
       token
     };
   } catch (error) {
@@ -334,9 +338,9 @@ export async function changePassword(userId: string, passwordData: {
       return { success: false, errors: passwordValidation.errors };
     }
     
-    // Get current user
-    const user = await storage.getUser(userId);
-    if (!user || !user.password) {
+    // Get current user (include password hash; schema uses select:false)
+    const user = await (UserModel as any).findById(userId).select('+password').lean();
+    if (!user || typeof user.password !== 'string' || user.password.length === 0) {
       return { success: false, errors: ['User not found'] };
     }
     
@@ -350,10 +354,11 @@ export async function changePassword(userId: string, passwordData: {
     const hashedNewPassword = await hashPassword(newPassword);
     
     // Update password
-    await storage.upsertUser({
-      ...user,
-      password: hashedNewPassword,
-    });
+    // Update password without clobbering other fields
+    await UserModel.updateOne(
+      { _id: (user as any)._id },
+      { $set: { password: hashedNewPassword } }
+    );
     
     return { success: true };
   } catch (error) {

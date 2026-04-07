@@ -38,9 +38,9 @@ app.use(helmet({
   },
 }));
 
-const allowedOrigins = (env.ALLOWED_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean);
+const allowedOrigins = (env.ALLOWED_ORIGINS || "http://localhost:5173").split(",").map(s => s.trim()).filter(Boolean);
 app.use(cors({
-  origin: env.NODE_ENV === "production" ? allowedOrigins : true,
+  origin: env.NODE_ENV === "production" ? allowedOrigins : "http://localhost:5173",
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Origin", "X-Requested-With", "Content-Type", "Accept", "Authorization"],
@@ -90,13 +90,14 @@ app.use((error: any, req: Request, res: Response, next: NextFunction) => {
 });
 
 // Session configuration
-const sessionSecret = env.SESSION_SECRET || 'fallback-session-secret-for-development';
+const sessionSecret = env.SESSION_SECRET;
 const mongoUri = env.MONGODB_URI;
 
 logger.info('🔍 Environment check:');
 logger.info(`- NODE_ENV: ${env.NODE_ENV}`);
 logger.info(`- PORT: ${env.PORT}`);
 logger.info(`- MONGODB_URI: ${mongoUri ? 'Set' : 'Not set'}`);
+logger.info(`- SESSION_SECRET: ${sessionSecret ? 'Set' : 'Not set'} (Length: ${sessionSecret.length})`);
 
 // Configure session middleware with fallback for development
 if (env.NODE_ENV === 'production' && mongoUri) {
@@ -116,7 +117,7 @@ if (env.NODE_ENV === 'production' && mongoUri) {
         secure: true,
         httpOnly: true,
         maxAge: 7 * 24 * 60 * 60 * 1000,
-        sameSite: 'lax',
+        sameSite: 'none', // IMPORTANT for cross-origin production
       },
     }));
     logger.info('✅ Session store configured with MongoDB for production');
@@ -130,8 +131,9 @@ if (env.NODE_ENV === 'production' && mongoUri) {
 }
 
 function setupMemorySessionStore() {
+  logger.info(`- SESSION_SECRET for memory store: ${env.SESSION_SECRET ? 'Set' : 'Not set'} (Length: ${env.SESSION_SECRET.length})`);
   app.use(session({
-    secret: sessionSecret,
+    secret: env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     cookie: {
