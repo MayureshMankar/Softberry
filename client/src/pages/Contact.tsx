@@ -73,8 +73,8 @@ export default function Contact() {
                     </div>
                     <div>
                       <h3 className="font-semibold mb-2" style={{ color: colors.text.primary }}>Visit Our Store</h3>
-                      <p style={{ color: colors.text.tertiary }}>123 Luxury Avenue</p>
-                      <p style={{ color: colors.text.tertiary }}>Mumbai, Maharashtra 400001</p>
+                      <p style={{ color: colors.text.tertiary }}>B/118 Hind Saurashtra Estate</p>
+                      <p style={{ color: colors.text.tertiary }}>Andheri (E), Mumbai 400059</p>
                       <p style={{ color: colors.text.tertiary }}>India</p>
                     </div>
                   </div>
@@ -92,8 +92,8 @@ export default function Contact() {
                     </div>
                     <div>
                       <h3 className="font-semibold mb-2" style={{ color: colors.text.primary }}>Call Us</h3>
-                      <p style={{ color: colors.text.tertiary }}>+91 98765 43210</p>
-                      <p className="text-sm" style={{ color: colors.text.tertiary }}>Available Mon-Sat, 10 AM - 8 PM</p>
+                      <p style={{ color: colors.text.tertiary }}>+91 99207 71494</p>
+                      <p className="text-sm" style={{ color: colors.text.tertiary }}>For wholesale and dealer inquiries, please contact us directly</p>
                     </div>
                   </div>
                 </Card>

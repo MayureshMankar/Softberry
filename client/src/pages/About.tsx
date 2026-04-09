@@ -17,23 +17,25 @@ import {
 } from "lucide-react";
 
 export default function About() {
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme();
   
   return (
     <div style={{ backgroundColor: colors.background, minHeight: '100vh' }}>
       <Header />
       
       {/* Hero Section */}
-      <section className="min-h-screen flex items-center relative overflow-hidden">
-        <div className="absolute inset-0 opacity-5">
-          <div 
-            className="absolute inset-0" 
-            style={{
-              backgroundImage: `radial-gradient(circle at 50% 50%, ${colors.accent} 1px, transparent 1px)`,
-              backgroundSize: "50px 50px"
-            }}
-          />
-        </div>
+      <section
+        className="min-h-screen flex items-center relative overflow-hidden"
+        style={{
+          backgroundImage:
+            theme === "dark"
+              ? "linear-gradient(rgba(8, 8, 8, 0.62), rgba(8, 8, 8, 0.56)), url('/uploads/about%20bg%20.png')"
+              : "linear-gradient(rgba(255, 255, 255, 0.44), rgba(245, 241, 234, 0.5)), url('/uploads/about%20bg%20.png')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+        }}
+      >
         
         <div className="container mx-auto px-4 relative">
           <div className="max-w-4xl mx-auto text-center">
