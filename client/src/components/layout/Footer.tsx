@@ -147,7 +147,7 @@ export function Footer() {
               <div className="flex items-start space-x-3">
                 <MapPin className="mt-1 h-4 w-4 flex-shrink-0" style={{ color: colors.text.accent }} />
                 <div>
-                  <p className="text-[#ACA69A]">B/118 Hind Saurashtra Estate</p>
+                  <p className="text-[#ACA69A]">B/18A Hind Saurashtra Estate</p>
                   <p className="text-[#ACA69A]">Andheri (E), Mumbai 400059</p>
                 </div>
               </div>

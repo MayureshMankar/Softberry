@@ -73,7 +73,7 @@ export default function Contact() {
                     </div>
                     <div>
                       <h3 className="font-semibold mb-2" style={{ color: colors.text.primary }}>Visit Our Store</h3>
-                      <p style={{ color: colors.text.tertiary }}>B/118 Hind Saurashtra Estate</p>
+                      <p style={{ color: colors.text.tertiary }}>B/18A Hind Saurashtra Estate</p>
                       <p style={{ color: colors.text.tertiary }}>Andheri (E), Mumbai 400059</p>
                       <p style={{ color: colors.text.tertiary }}>India</p>
                     </div>
