@@ -27,8 +27,6 @@ export default function Cart() {
   const { isAuthenticated } = useAuth();
   const { colors } = useTheme();
   const { toast } = useToast();
-  const [promoCode, setPromoCode] = useState("");
-  const [promoApplied, setPromoApplied] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   const formatPrice = (price: string | number) => {
@@ -47,25 +45,8 @@ export default function Cart() {
     removeFromCart(id);
   };
 
-  const applyPromoCode = () => {
-    if (promoCode.toLowerCase() === "welcome10") {
-      setPromoApplied(true);
-      toast({
-        title: "Promo Code Applied!",
-        description: "You saved 10% on your order",
-      });
-    } else {
-      toast({
-        title: "Invalid Promo Code",
-        description: "Please check your code and try again",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const discount = promoApplied ? totalAmount * 0.1 : 0;
   const shipping = totalAmount > 5000 ? 0 : 200;
-  const finalTotal = totalAmount - discount + shipping;
+  const finalTotal = totalAmount + shipping;
 
   if (!isAuthenticated) {
     return (
@@ -376,55 +357,6 @@ export default function Cart() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* Promo Code */}
-                  <div className="space-y-3">
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="Enter promo code"
-                        value={promoCode}
-                        onChange={(e) => setPromoCode(e.target.value)}
-                        data-testid="promo-code-input"
-                        style={{ 
-                          backgroundColor: colors.background,
-                          color: colors.text.primary,
-                          borderColor: colors.border
-                        }}
-                      />
-                      <Button
-                        variant="outline"
-                        onClick={applyPromoCode}
-                        disabled={promoApplied}
-                        data-testid="apply-promo-button"
-                        style={{
-                          borderColor: colors.border,
-                          color: colors.text.primary,
-                          backgroundColor: 'transparent'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = colors.accent;
-                          e.currentTarget.style.color = colors.background;
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                          e.currentTarget.style.color = colors.text.primary;
-                        }}
-                      >
-                        {promoApplied ? <Percent className="h-4 w-4" /> : "Apply"}
-                      </Button>
-                    </div>
-                    {promoApplied && (
-                      <div 
-                        className="flex items-center text-sm"
-                        style={{ color: colors.accent }}
-                      >
-                        <Gift className="mr-1 h-3 w-3" />
-                        WELCOME10 applied - 10% off!
-                      </div>
-                    )}
-                  </div>
-
-                  <Separator style={{ backgroundColor: colors.border }} />
-
                   {/* Order Breakdown */}
                   <div className="space-y-3">
                     <div className="flex justify-between">
@@ -437,16 +369,6 @@ export default function Cart() {
                         {formatPrice(totalAmount)}
                       </span>
                     </div>
-                    
-                    {promoApplied && (
-                      <div 
-                        className="flex justify-between"
-                        style={{ color: colors.accent }}
-                      >
-                        <span>Discount (10%)</span>
-                        <span>-{formatPrice(discount)}</span>
-                      </div>
-                    )}
                     
                     <div className="flex justify-between">
                       <span style={{ color: colors.text.secondary }}>Shipping</span>

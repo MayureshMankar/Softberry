@@ -36,6 +36,31 @@ export default function Checkout() {
   const [sameAsShipping, setSameAsShipping] = useState(true);
   const [isRazorpayConfigured, setIsRazorpayConfigured] = useState(true); // Default to true to show option until we check
 
+  // Promo code state
+  const [promoCode, setPromoCode] = useState("");
+  const [isPromoApplied, setIsPromoApplied] = useState(false);
+  const [promoError, setPromoError] = useState("");
+
+  const handleApplyPromo = () => {
+    if (promoCode.trim().toUpperCase() === "SAVE20" || promoCode.trim().toUpperCase() === "DISCOUNT20") {
+      setIsPromoApplied(true);
+      setPromoError("");
+      toast({
+        title: "Promo Code Applied",
+        description: "20% discount has been applied to your order.",
+      });
+    } else {
+      setIsPromoApplied(false);
+      setPromoError("Invalid promo code");
+    }
+  };
+
+  const handleRemovePromo = () => {
+    setIsPromoApplied(false);
+    setPromoCode("");
+    setPromoError("");
+  };
+
   // Check if Razorpay is configured
   useEffect(() => {
     const checkRazorpayConfig = async () => {
@@ -97,7 +122,7 @@ export default function Checkout() {
 
   // Calculate order summary
   const shippingCost = totalAmount > 5000 ? 0 : 200;
-  const discount = 0; // No discount applied in this flow
+  const discount = isPromoApplied ? totalAmount * 0.2 : 0; // 20% Discount
   const finalTotal = totalAmount + shippingCost - discount;
 
   const formatPrice = (price: number) => {
@@ -1306,6 +1331,41 @@ export default function Checkout() {
                     ))}
                   </div>
                   
+                  <Separator style={{ backgroundColor: colors.border }} />
+                  
+                  {/* Promo Code Section */}
+                  <div className="space-y-3 py-2">
+                    <Label style={{ color: colors.text.primary }}>Promo Code</Label>
+                    <div className="flex gap-2">
+                      <Input 
+                        value={promoCode} 
+                        onChange={(e) => setPromoCode(e.target.value)} 
+                        disabled={isPromoApplied}
+                        placeholder="e.g. SAVE20"
+                        style={{ 
+                          backgroundColor: colors.background,
+                          color: colors.text.primary,
+                          borderColor: promoError ? 'red' : colors.border
+                        }}
+                      />
+                      {isPromoApplied ? (
+                        <Button type="button" onClick={handleRemovePromo} variant="destructive">Remove</Button>
+                      ) : (
+                        <Button 
+                          type="button"
+                          onClick={handleApplyPromo} 
+                          style={{ backgroundColor: colors.accent, color: colors.background }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = colors.accentHover}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = colors.accent}
+                        >
+                          Apply
+                        </Button>
+                      )}
+                    </div>
+                    {promoError && <p className="text-sm text-red-500 font-medium">{promoError}</p>}
+                    {isPromoApplied && <p className="text-sm font-medium" style={{ color: colors.accent }}>20% discount applied!</p>}
+                  </div>
+
                   <Separator style={{ backgroundColor: colors.border }} />
                   
                   <div className="space-y-2">
